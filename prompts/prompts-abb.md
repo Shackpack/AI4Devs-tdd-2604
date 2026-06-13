@@ -398,3 +398,42 @@ registra los promps y las respuestas en @[prompts/prompts-abb.md]
 Registrada implementación de Fase 4 en prompts-abb.md.
 
 ---
+
+## Code Review Fase 1 - SOLID y Clean Code (2026-06-13)
+
+### Prompt del Usuario
+```
+haz code-review de @[backend/src/tests/tests-abb.test.ts] busca violaciones de principios SOLID y clean code en los mismos para los tests de la fase 1 de @[backend/src/tests/test-abb-plan.md] y procede a resolverlas
+```
+
+### Respuesta del Asistente
+Code review completo de los tests de Fase 1. Se identificaron y resolvieron **8 violaciones** de principios SOLID/Clean Code:
+
+**Violaciones corregidas:**
+
+| # | Principio | Violación | Solución |
+|---|-----------|-----------|----------|
+| V1 | Clean Code (1 assert/test) | `validateName` — especiales: 2 asserts en 1 `it` | Separado en `@ character` y `# character` |
+| V2 | Clean Code (1 assert/test) | `validateName` — tildes: 2 asserts en 1 `it` | Separado en lowercase (áéíóú) y uppercase (ÁÉÍÓÚ) |
+| V3 | Clean Code (1 assert/test) | `validateName` — ñÑ: 2 asserts en 1 `it` | Separado en `ñ (lowercase)` y `Ñ (uppercase)` |
+| V4 | Clean Code (1 assert/test) | `validateName` — spaces: 2 asserts en 1 `it` | Separado en single space y compound names |
+| V5 | Clean Code (1 assert/test) | `validateDate` — year boundaries: 2 asserts en 1 `it` | Separado en January 1st y December 31st |
+| V6 | Clean Code (1 assert/test) | `validateCV` — not an object: 2 asserts en 1 `it` | Separado en string y number |
+| V7 | Clean Code (naming) | `validatePhone` — descripción "8 digits" incorrecta (valores tienen 9 dígitos) | Renombrado a `"valid length but wrong prefix"` |
+| V8 | DRY (SRP/OCP) | Fixtures `validEducation`, `validExperience`, `validCV` duplicados en 4 bloques | Elevados a constantes `VALID_EDUCATION`, `VALID_EXPERIENCE`, `VALID_CV` al scope de Fase 1 |
+
+**Resultado:** 160 tests pasando ✅ (sin regresiones tras el refactor)
+
+---
+
+## Registro de Prompts Actualizado - Code Review (2026-06-13)
+
+### Prompt del Usuario
+```
+registra este prompt y la respuesta en @[prompts/prompts-abb.md]
+```
+
+### Respuesta del Asistente
+Registrado el code review de Fase 1 y su respuesta en prompts-abb.md.
+
+---

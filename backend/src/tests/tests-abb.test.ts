@@ -104,6 +104,28 @@ import { Resume } from '../domain/models/Resume';
 // ============================================================
 describe('Fase 1: Validator Tests - RED', () => {
 
+    // Shared fixtures — defined at Fase 1 scope to avoid duplication across blocks
+    const VALID_EDUCATION = {
+        institution: 'Universidad Complutense',
+        title: 'Ingeniería Informática',
+        startDate: '2020-09-01',
+        endDate: '2024-06-30',
+    };
+
+    const VALID_EXPERIENCE = {
+        company: 'TechCorp',
+        position: 'Software Developer',
+        description: 'Desarrollo backend con Node.js',
+        startDate: '2024-01-15',
+        endDate: undefined,
+    };
+
+    const VALID_CV = {
+        filePath: '/uploads/cv-juan.pdf',
+        fileType: 'application/pdf',
+    };
+
+
     // ============================================================
     // BLOQUE 1.1: Validación de Nombres (firstName, lastName)
     // ============================================================
@@ -125,18 +147,27 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validateName('Juan123')).toThrow('Invalid name');
         });
 
-        it('should throw "Invalid name" when name contains special characters', () => {
+        it('should throw "Invalid name" when name contains @ character', () => {
             expect(() => validateName('Juan@Perez')).toThrow('Invalid name');
+        });
+
+        it('should throw "Invalid name" when name contains # character', () => {
             expect(() => validateName('María#')).toThrow('Invalid name');
         });
 
-        it('should pass with Spanish tildes (áéíóúÁÉÍÓÚ)', () => {
+        it('should pass with Spanish tildes lowercase (áéíóú)', () => {
             expect(() => validateName('José María')).not.toThrow();
+        });
+
+        it('should pass with Spanish tildes uppercase (ÁÉÍÓÚ)', () => {
             expect(() => validateName('Ángel Édgar Íñigo Óscar Úrsula')).not.toThrow();
         });
 
-        it('should pass with Spanish letter ñÑ', () => {
+        it('should pass with Spanish letter ñ (lowercase)', () => {
             expect(() => validateName('Niño Niña')).not.toThrow();
+        });
+
+        it('should pass with Spanish letter Ñ (uppercase)', () => {
             expect(() => validateName('Ñoño')).not.toThrow();
         });
 
@@ -149,8 +180,11 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validateName(validName)).not.toThrow();
         });
 
-        it('should pass with spaces between names', () => {
+        it('should pass with single space between names', () => {
             expect(() => validateName('Juan Carlos')).not.toThrow();
+        });
+
+        it('should pass with multiple spaces between compound names', () => {
             expect(() => validateName('María de la Paz')).not.toThrow();
         });
     });
@@ -224,11 +258,11 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validatePhone('912345678')).not.toThrow();
         });
 
-        it('should throw "Invalid phone" when phone has 8 digits but wrong prefix (5)', () => {
+        it('should throw "Invalid phone" when phone has valid length but wrong prefix (5)', () => {
             expect(() => validatePhone('512345678')).toThrow('Invalid phone');
         });
 
-        it('should throw "Invalid phone" when phone has 8 digits but wrong prefix (8)', () => {
+        it('should throw "Invalid phone" when phone has valid length but wrong prefix (8)', () => {
             expect(() => validatePhone('812345678')).toThrow('Invalid phone');
         });
 
@@ -289,8 +323,11 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validateDate('2024-02-29')).not.toThrow();
         });
 
-        it('should pass with valid date at year boundaries', () => {
+        it('should pass with valid date at year start boundary (January 1st)', () => {
             expect(() => validateDate('2024-01-01')).not.toThrow();
+        });
+
+        it('should pass with valid date at year end boundary (December 31st)', () => {
             expect(() => validateDate('2024-12-31')).not.toThrow();
         });
     });
@@ -330,55 +367,49 @@ describe('Fase 1: Validator Tests - RED', () => {
     // BLOQUE 1.6: Validación de Educación
     // ============================================================
     describe('validateEducation', () => {
-        const validEducation = {
-            institution: 'Universidad Complutense',
-            title: 'Ingeniería Informática',
-            startDate: '2020-09-01',
-            endDate: '2024-06-30',
-        };
 
         it('should throw "Invalid institution" when institution is empty', () => {
-            const education = { ...validEducation, institution: '' };
+            const education = { ...VALID_EDUCATION, institution: '' };
             expect(() => validateEducation(education)).toThrow('Invalid institution');
         });
 
         it('should throw "Invalid institution" when institution exceeds 100 chars', () => {
-            const education = { ...validEducation, institution: 'U'.repeat(101) };
+            const education = { ...VALID_EDUCATION, institution: 'U'.repeat(101) };
             expect(() => validateEducation(education)).toThrow('Invalid institution');
         });
 
         it('should throw "Invalid title" when title is empty', () => {
-            const education = { ...validEducation, title: '' };
+            const education = { ...VALID_EDUCATION, title: '' };
             expect(() => validateEducation(education)).toThrow('Invalid title');
         });
 
         it('should throw "Invalid title" when title exceeds 100 chars', () => {
-            const education = { ...validEducation, title: 'T'.repeat(101) };
+            const education = { ...VALID_EDUCATION, title: 'T'.repeat(101) };
             expect(() => validateEducation(education)).toThrow('Invalid title');
         });
 
         it('should throw "Invalid date" when startDate is invalid', () => {
-            const education = { ...validEducation, startDate: 'invalid' };
+            const education = { ...VALID_EDUCATION, startDate: 'invalid' };
             expect(() => validateEducation(education)).toThrow('Invalid date');
         });
 
         it('should throw "Invalid end date" when endDate has wrong format', () => {
-            const education = { ...validEducation, endDate: '15-01-2024' };
+            const education = { ...VALID_EDUCATION, endDate: '15-01-2024' };
             expect(() => validateEducation(education)).toThrow('Invalid end date');
         });
 
         it('should pass when endDate is undefined', () => {
-            const education = { ...validEducation, endDate: undefined };
+            const education = { ...VALID_EDUCATION, endDate: undefined };
             expect(() => validateEducation(education)).not.toThrow();
         });
 
         it('should pass when endDate is null', () => {
-            const education = { ...validEducation, endDate: null };
+            const education = { ...VALID_EDUCATION, endDate: null };
             expect(() => validateEducation(education)).not.toThrow();
         });
 
         it('should pass with valid education data', () => {
-            expect(() => validateEducation(validEducation)).not.toThrow();
+            expect(() => validateEducation(VALID_EDUCATION)).not.toThrow();
         });
     });
 
@@ -386,51 +417,44 @@ describe('Fase 1: Validator Tests - RED', () => {
     // BLOQUE 1.7: Validación de Experiencia Laboral
     // ============================================================
     describe('validateExperience', () => {
-        const validExperience = {
-            company: 'TechCorp',
-            position: 'Software Developer',
-            description: 'Desarrollo backend con Node.js',
-            startDate: '2024-01-15',
-            endDate: undefined,
-        };
 
         it('should throw "Invalid company" when company is empty', () => {
-            const experience = { ...validExperience, company: '' };
+            const experience = { ...VALID_EXPERIENCE, company: '' };
             expect(() => validateExperience(experience)).toThrow('Invalid company');
         });
 
         it('should throw "Invalid company" when company exceeds 100 chars', () => {
-            const experience = { ...validExperience, company: 'C'.repeat(101) };
+            const experience = { ...VALID_EXPERIENCE, company: 'C'.repeat(101) };
             expect(() => validateExperience(experience)).toThrow('Invalid company');
         });
 
         it('should throw "Invalid position" when position is empty', () => {
-            const experience = { ...validExperience, position: '' };
+            const experience = { ...VALID_EXPERIENCE, position: '' };
             expect(() => validateExperience(experience)).toThrow('Invalid position');
         });
 
         it('should throw "Invalid position" when position exceeds 100 chars', () => {
-            const experience = { ...validExperience, position: 'P'.repeat(101) };
+            const experience = { ...VALID_EXPERIENCE, position: 'P'.repeat(101) };
             expect(() => validateExperience(experience)).toThrow('Invalid position');
         });
 
         it('should throw "Invalid description" when description exceeds 200 chars', () => {
-            const experience = { ...validExperience, description: 'D'.repeat(201) };
+            const experience = { ...VALID_EXPERIENCE, description: 'D'.repeat(201) };
             expect(() => validateExperience(experience)).toThrow('Invalid description');
         });
 
         it('should pass when description is undefined', () => {
-            const experience = { ...validExperience, description: undefined };
+            const experience = { ...VALID_EXPERIENCE, description: undefined };
             expect(() => validateExperience(experience)).not.toThrow();
         });
 
         it('should pass when description is empty string', () => {
-            const experience = { ...validExperience, description: '' };
+            const experience = { ...VALID_EXPERIENCE, description: '' };
             expect(() => validateExperience(experience)).not.toThrow();
         });
 
         it('should pass with valid experience data', () => {
-            expect(() => validateExperience(validExperience)).not.toThrow();
+            expect(() => validateExperience(VALID_EXPERIENCE)).not.toThrow();
         });
     });
 
@@ -438,13 +462,12 @@ describe('Fase 1: Validator Tests - RED', () => {
     // BLOQUE 1.8: Validación de CV
     // ============================================================
     describe('validateCV', () => {
-        const validCV = {
-            filePath: '/uploads/cv-juan.pdf',
-            fileType: 'application/pdf',
-        };
 
-        it('should throw "Invalid CV data" when cv is not an object', () => {
+        it('should throw "Invalid CV data" when cv is a string', () => {
             expect(() => validateCV('not an object')).toThrow('Invalid CV data');
+        });
+
+        it('should throw "Invalid CV data" when cv is a number', () => {
             expect(() => validateCV(123)).toThrow('Invalid CV data');
         });
 
@@ -469,7 +492,7 @@ describe('Fase 1: Validator Tests - RED', () => {
         });
 
         it('should pass with valid CV data', () => {
-            expect(() => validateCV(validCV)).not.toThrow();
+            expect(() => validateCV(VALID_CV)).not.toThrow();
         });
 
         it('should pass when cv is empty object (optional)', () => {
@@ -491,27 +514,9 @@ describe('Fase 1: Validator Tests - RED', () => {
             email: 'juan.perez@example.com',
             phone: '612345678',
             address: 'Calle Mayor 123',
-            educations: [
-                {
-                    institution: 'Universidad Complutense',
-                    title: 'Ingeniería',
-                    startDate: '2020-09-01',
-                    endDate: '2024-06-30',
-                },
-            ],
-            workExperiences: [
-                {
-                    company: 'TechCorp',
-                    position: 'Developer',
-                    description: 'Backend development',
-                    startDate: '2024-07-01',
-                    endDate: undefined,
-                },
-            ],
-            cv: {
-                filePath: '/uploads/cv.pdf',
-                fileType: 'application/pdf',
-            },
+            educations: [VALID_EDUCATION],
+            workExperiences: [VALID_EXPERIENCE],
+            cv: VALID_CV,
         };
 
         // Happy Path
