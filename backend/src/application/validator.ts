@@ -5,37 +5,54 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 //Length validations according to the database schema
 
-const validateName = (name: string) => {
+export const validateName = (name: string) => {
     if (!name || name.length < 2 || name.length > 100 || !NAME_REGEX.test(name)) {
         throw new Error('Invalid name');
     }
 };
 
-const validateEmail = (email: string) => {
+export const validateEmail = (email: string) => {
     if (!email || !EMAIL_REGEX.test(email)) {
         throw new Error('Invalid email');
     }
 };
 
-const validatePhone = (phone: string) => {
-    if (phone && !PHONE_REGEX.test(phone)) {
+export const validatePhone = (phone: string | undefined | null) => {
+    if (phone === undefined || phone === null) {
+        return; // Optional field
+    }
+    if (!phone || !PHONE_REGEX.test(phone)) {
         throw new Error('Invalid phone');
     }
 };
 
-const validateDate = (date: string) => {
+export const validateDate = (date: string) => {
     if (!date || !DATE_REGEX.test(date)) {
+        throw new Error('Invalid date');
+    }
+    // Validate it's a real date (not just format)
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+        throw new Error('Invalid date');
+    }
+    // Verify the date components match (catches invalid dates like 2024-13-01)
+    const [year, month, day] = date.split('-').map(Number);
+    if (
+        parsedDate.getUTCFullYear() !== year ||
+        parsedDate.getUTCMonth() + 1 !== month ||
+        parsedDate.getUTCDate() !== day
+    ) {
         throw new Error('Invalid date');
     }
 };
 
-const validateAddress = (address: string) => {
+export const validateAddress = (address: string | undefined | null) => {
     if (address && address.length > 100) {
         throw new Error('Invalid address');
     }
 };
 
-const validateEducation = (education: any) => {
+export const validateEducation = (education: any) => {
     if (!education.institution || education.institution.length > 100) {
         throw new Error('Invalid institution');
     }
@@ -51,7 +68,7 @@ const validateEducation = (education: any) => {
     }
 };
 
-const validateExperience = (experience: any) => {
+export const validateExperience = (experience: any) => {
     if (!experience.company || experience.company.length > 100) {
         throw new Error('Invalid company');
     }
@@ -71,8 +88,21 @@ const validateExperience = (experience: any) => {
     }
 };
 
-const validateCV = (cv: any) => {
-    if (typeof cv !== 'object' || !cv.filePath || typeof cv.filePath !== 'string' || !cv.fileType || typeof cv.fileType !== 'string') {
+export const validateCV = (cv: any) => {
+    // CV is optional - null, undefined, or empty object are valid
+    if (cv === null || cv === undefined) {
+        return;
+    }
+    // Must be an object (but not an array)
+    if (typeof cv !== 'object' || Array.isArray(cv)) {
+        throw new Error('Invalid CV data');
+    }
+    // Empty object is valid (optional field)
+    if (Object.keys(cv).length === 0) {
+        return;
+    }
+    // If object has data, validate required fields
+    if (!cv.filePath || typeof cv.filePath !== 'string' || !cv.fileType || typeof cv.fileType !== 'string') {
         throw new Error('Invalid CV data');
     }
 };
