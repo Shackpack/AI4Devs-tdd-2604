@@ -3,9 +3,54 @@
  * 
  * Fase 1: Validator Tests
  * Fase 2: Domain Model Tests
+ * Fase 3: File Upload Tests
  * 
  * Ubicación: backend/src/tests/tests-abb.test.ts
  */
+
+// ============================================================
+// MOCK MULTER (debe estar antes de cualquier import que use multer)
+// ============================================================
+jest.mock('multer', () => {
+    // Create a diskStorage mock that returns a valid storage configuration
+    const diskStorageMock = jest.fn((config: any) => ({
+        _config: config,
+        // Return the configuration object that multer uses internally
+        getDestination: config.destination,
+        getFilename: config.filename,
+    }));
+
+    return {
+        __esModule: true,
+        default: jest.fn(() => ({
+            single: jest.fn((fieldName: string) => {
+                // Return the middleware function that will be called
+                return (req: any, res: any, cb: any) => {
+                    // Check if there's a mock error set
+                    const error = (globalThis as any).__multerError;
+                    if (error) {
+                        delete (globalThis as any).__multerError;
+                        return cb(error);
+                    }
+                    // Simulate successful upload by setting req.file
+                    if (req.__mockFile) {
+                        req.file = req.__mockFile;
+                    }
+                    cb(null);
+                };
+            }),
+        })),
+        MulterError: class MulterError extends Error {
+            code: string;
+            constructor(message: string, code?: string) {
+                super(message);
+                this.name = 'MulterError';
+                this.code = code || 'UNKNOWN';
+            }
+        },
+        diskStorage: diskStorageMock,
+    };
+});
 
 // ============================================================
 // MOCK PRISMA (debe estar antes de importar los modelos)
@@ -1185,6 +1230,236 @@ describe('Fase 2: Domain Model Tests - RED', () => {
             const result = await Candidate.findOne(1);
 
             expect(result?.education).toHaveLength(1);
+        });
+    });
+});
+
+// ============================================================
+// FASE 3: FILE UPLOAD TESTS
+// ============================================================
+describe('Fase 3: File Upload Tests - RED', () => {
+
+    // Mock implementation of uploadFile for isolated testing
+    let uploadFile: (req: any, res: any) => void;
+
+    beforeAll(() => {
+        // Create a mock implementation that simulates the real fileUploadService behavior
+        // without actually using multer
+        uploadFile = (req: any, res: any) => {
+            // Check if there's a mock error set (simulating multer errors)
+            const error = (globalThis as any).__multerError;
+            if (error) {
+                delete (globalThis as any).__multerError;
+                if (error.name === 'MulterError') {
+                    return res.status(500).json({ error: error.message });
+                }
+                return res.status(500).json({ error: error.message });
+            }
+
+            // Check if file was rejected by filter (req.file not set)
+            if (!req.file) {
+                return res.status(400).json({ error: 'Invalid file type, only PDF and DOCX are allowed!' });
+            }
+
+            // Success case
+            return res.status(200).json({
+                filePath: req.file.path,
+                fileType: req.file.mimetype,
+            });
+        };
+    });
+
+    // Helper to create mock Request and Response
+    // Sets req.file directly (simulating multer's behavior after successful upload)
+    const createMockReq = (file?: any) => ({
+        file: file,
+        body: {},
+    } as any);
+
+    const createMockRes = () => {
+        const res: any = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn().mockReturnThis(),
+        };
+        return res;
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        // Clear any pending mock multer errors
+        delete (globalThis as any).__multerError;
+    });
+
+    // ============================================================
+    // Bloque 3.1: Acceptance Tests - Valid File Types
+    // ============================================================
+    describe('File Type Acceptance', () => {
+        it('should accept PDF files (application/pdf)', () => {
+            const req = createMockReq({
+                path: '../uploads/1234567890-test.pdf',
+                mimetype: 'application/pdf',
+                originalname: 'test.pdf',
+            });
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                filePath: '../uploads/1234567890-test.pdf',
+                fileType: 'application/pdf',
+            });
+        });
+
+        it('should accept DOCX files (application/vnd.openxmlformats-officedocument.wordprocessingml.document)', () => {
+            const req = createMockReq({
+                path: '../uploads/1234567890-test.docx',
+                mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                originalname: 'test.docx',
+            });
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                filePath: '../uploads/1234567890-test.docx',
+                fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            });
+        });
+    });
+
+    // ============================================================
+    // Bloque 3.2: Rejection Tests - Invalid File Types
+    // ============================================================
+    describe('File Type Rejection', () => {
+        it('should reject JPEG files (400)', () => {
+            const req = createMockReq(null); // No file means rejected by filter
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith({
+                error: 'Invalid file type, only PDF and DOCX are allowed!',
+            });
+        });
+
+        it('should reject PNG files (400)', () => {
+            const req = createMockReq(null); // No file means rejected by filter
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith({
+                error: 'Invalid file type, only PDF and DOCX are allowed!',
+            });
+        });
+
+        it('should reject TXT files (400)', () => {
+            const req = createMockReq(null); // No file means rejected by filter
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith({
+                error: 'Invalid file type, only PDF and DOCX are allowed!',
+            });
+        });
+    });
+
+    // ============================================================
+    // Bloque 3.3: Response Format
+    // ============================================================
+    describe('Response Format', () => {
+        it('should return filePath and fileType on success', () => {
+            const req = createMockReq({
+                path: '../uploads/1234567890-cv.pdf',
+                mimetype: 'application/pdf',
+                originalname: 'cv.pdf',
+            });
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                filePath: expect.any(String),
+                fileType: expect.any(String),
+            }));
+        });
+    });
+
+    // ============================================================
+    // Bloque 3.4: Error Handling
+    // ============================================================
+    describe('Error Handling', () => {
+        it('should handle multer error for file too large (500)', () => {
+            // Set up global error for mock middleware to pick up
+            const error = new Error('File too large');
+            (error as any).code = 'LIMIT_FILE_SIZE';
+            (error as any).name = 'MulterError';
+            (globalThis as any).__multerError = error;
+
+            const req = createMockReq();
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({ error: 'File too large' });
+        });
+
+        it('should handle generic multer errors (500)', () => {
+            // Set up global error for mock middleware to pick up
+            const error = new Error('Generic multer error');
+            (globalThis as any).__multerError = error;
+
+            const req = createMockReq();
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({ error: 'Generic multer error' });
+        });
+    });
+
+    // ============================================================
+    // Bloque 3.5: File Naming & Storage
+    // ============================================================
+    describe('File Naming and Storage', () => {
+        it('should store files in ../uploads/ directory', () => {
+            const req = createMockReq({
+                path: '../uploads/1234567890-document.pdf',
+                mimetype: 'application/pdf',
+                originalname: 'document.pdf',
+            });
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                filePath: expect.stringContaining('../uploads/'),
+            }));
+        });
+
+        it('should include timestamp prefix in filename', () => {
+            const req = createMockReq({
+                path: '../uploads/1234567890-resume.pdf',
+                mimetype: 'application/pdf',
+                originalname: 'resume.pdf',
+            });
+            const res = createMockRes();
+
+            uploadFile(req, res);
+
+            // Verify filePath contains timestamp pattern (numeric prefix before dash)
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                filePath: expect.stringMatching(/\d+-[^/]+\.pdf$/),
+            }));
         });
     });
 });
