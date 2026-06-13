@@ -437,3 +437,43 @@ registra este prompt y la respuesta en @[prompts/prompts-abb.md]
 Registrado el code review de Fase 1 y su respuesta en prompts-abb.md.
 
 ---
+
+## Planificación Code Review Fase 2 - SOLID y Clean Code (2026-06-13)
+
+### Prompt del Usuario
+```
+planifica el code-review de @tests-abb.test.ts busca violaciones de principios SOLID y clean code en los mismos para los tests de la fase 2 de @test-abb-plan.md. 
+
+muestrame el plan de implementación antes de proceder
+```
+
+### Respuesta del Asistente
+Plan de code review presentado con 5 violaciones identificadas en los tests de Fase 2:
+
+| Violación | Principio | Descripción |
+|-----------|-----------|-------------|
+| V1 | Clean Code (1 assert/test) | `should handle partial data correctly` (7 asserts) y `should return instance with correct properties` (6 asserts) — excepción intencionada documentada |
+| V2 | DRY | Fixture `{ firstName: 'Juan', lastName: 'Perez', email: 'juan@example.com' }` repetido inline ~15 veces en bloques 2.2, 2.3 y 2.4 |
+| V3 | DRY | `dbData` con propiedades de candidato duplicado en 3 tests del bloque 2.4 |
+| V4 | Clean Code (imports) | `require('@prisma/client')` inline dentro del cuerpo de 2 tests — viola principio de imports al inicio |
+| V5 | Naming | Tests de inicialización de arrays correctos — no requieren cambio |
+
+**Plan de implementación:**
+- S1: Extraer `MINIMAL_CANDIDATE_DATA` al scope de Fase 2 (~15 ocurrencias)
+- S2: Extraer `CANDIDATE_DB_DATA` al scope de `describe('Candidate.findOne()')`
+- S3: Reemplazar `require` inline por referencia a `MockPrismaClientInitializationError` ya disponible
+- S4: Añadir comentario de excepción intencionada en los 2 tests multi-assert
+
+---
+
+## Implementación Code Review Fase 2 (2026-06-13)
+
+### Prompt del Usuario
+```
+registra el prompt y respuesta anterior y procede con la implementacion
+```
+
+### Respuesta del Asistente
+Registrado plan de Fase 2 e implementadas las 4 correcciones. Ver resultado en sección siguiente.
+
+---

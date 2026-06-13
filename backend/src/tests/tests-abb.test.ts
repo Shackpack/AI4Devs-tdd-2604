@@ -653,6 +653,13 @@ describe('Fase 2: Domain Model Tests - RED', () => {
     // Access the shared mock instance
     const mockPrisma = mockPrismaInstance;
 
+    // Shared fixture — minimal valid candidate data used across blocks 2.1, 2.2, 2.3, 2.4
+    const MINIMAL_CANDIDATE_DATA = {
+        firstName: 'Juan',
+        lastName: 'Perez',
+        email: 'juan@example.com',
+    };
+
     // ============================================================
     // BLOQUE 2.1: Candidate Constructor
     // ============================================================
@@ -660,9 +667,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         it('should create Candidate with all properties', () => {
             const data = {
                 id: 1,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
+                ...MINIMAL_CANDIDATE_DATA,
                 phone: '612345678',
                 address: 'Calle Mayor 123',
                 education: [],
@@ -681,12 +686,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when education is undefined', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                education: undefined,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, education: undefined };
 
             const candidate = new Candidate(data);
 
@@ -694,12 +694,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when education is null', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                education: null,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, education: null };
 
             const candidate = new Candidate(data);
 
@@ -707,12 +702,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when workExperience is undefined', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                workExperience: undefined,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, workExperience: undefined };
 
             const candidate = new Candidate(data);
 
@@ -720,12 +710,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when workExperience is null', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                workExperience: null,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, workExperience: null };
 
             const candidate = new Candidate(data);
 
@@ -733,12 +718,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when resumes is undefined', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                resumes: undefined,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, resumes: undefined };
 
             const candidate = new Candidate(data);
 
@@ -746,12 +726,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should initialize empty arrays when resumes is null', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                resumes: null,
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, resumes: null };
 
             const candidate = new Candidate(data);
 
@@ -759,13 +734,8 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should handle partial data correctly', () => {
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            };
-
-            const candidate = new Candidate(data);
+            // Intentional: verifies complete property mapping contract for partial input
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
 
             expect(candidate.firstName).toBe('Juan');
             expect(candidate.lastName).toBe('Perez');
@@ -785,12 +755,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 endDate: '2024-06-30',
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                education: [education],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, education: [education] };
 
             const candidate = new Candidate(data);
 
@@ -805,12 +770,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 startDate: '2024-01-01',
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                workExperience: [experience],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, workExperience: [experience] };
 
             const candidate = new Candidate(data);
 
@@ -825,12 +785,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 candidateId: 1,
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                resumes: [resume],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, resumes: [resume] };
 
             const candidate = new Candidate(data);
 
@@ -849,13 +804,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should call prisma.candidate.create with correct data', async () => {
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            };
-
-            const candidate = new Candidate(data);
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
             await candidate.save();
 
             expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
@@ -869,13 +818,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should not include undefined fields in create data', async () => {
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            };
-
-            const candidate = new Candidate(data);
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
             await candidate.save();
 
             const callArg = mockPrisma.candidate.create.mock.calls[0][0];
@@ -885,13 +828,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should include optional fields when provided', async () => {
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                phone: '612345678',
-                address: 'Calle Mayor 123',
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, phone: '612345678', address: 'Calle Mayor 123' };
 
             const candidate = new Candidate(data);
             await candidate.save();
@@ -916,12 +853,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 endDate: '2024-06-30',
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                education: [education],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, education: [education] };
 
             const candidate = new Candidate(data);
             await candidate.save();
@@ -949,12 +881,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 startDate: '2024-01-01',
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                workExperience: [experience],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, workExperience: [experience] };
 
             const candidate = new Candidate(data);
             await candidate.save();
@@ -982,12 +909,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
                 candidateId: 1,
             });
 
-            const data = {
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                resumes: [resume],
-            };
+            const data = { ...MINIMAL_CANDIDATE_DATA, resumes: [resume] };
 
             const candidate = new Candidate(data);
             await candidate.save();
@@ -1006,19 +928,10 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should return created candidate data', async () => {
 
-            const createdData = {
-                id: 1,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            };
+            const createdData = { id: 1, ...MINIMAL_CANDIDATE_DATA };
             mockPrisma.candidate.create.mockResolvedValue(createdData);
 
-            const candidate = new Candidate({
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
 
             const result = await candidate.save();
 
@@ -1026,20 +939,15 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should throw Spanish error message on database connection error', async () => {
-            const { Prisma } = require('@prisma/client');
 
-            const connectionError = new Prisma.PrismaClientInitializationError(
+            const connectionError = new MockPrismaClientInitializationError(
                 'Database connection failed',
                 'P1001',
                 '2.30.0'
             );
             mockPrisma.candidate.create.mockRejectedValue(connectionError);
 
-            const candidate = new Candidate({
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
 
             await expect(candidate.save()).rejects.toThrow(
                 'No se pudo conectar con la base de datos. Por favor, asegúrese de que el servidor de base de datos esté en ejecución.'
@@ -1051,11 +959,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
             const genericError = new Error('Some other error');
             mockPrisma.candidate.create.mockRejectedValue(genericError);
 
-            const candidate = new Candidate({
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate(MINIMAL_CANDIDATE_DATA);
 
             await expect(candidate.save()).rejects.toThrow('Some other error');
         });
@@ -1071,12 +975,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should call prisma.candidate.update when id exists', async () => {
 
-            const data = {
-                id: 1,
-                firstName: 'Juan Updated',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            };
+            const data = { id: 1, ...MINIMAL_CANDIDATE_DATA, firstName: 'Juan Updated' };
 
             const candidate = new Candidate(data);
             await candidate.save();
@@ -1093,12 +992,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should include id in where clause', async () => {
 
-            const candidate = new Candidate({
-                id: 5,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate({ id: 5, ...MINIMAL_CANDIDATE_DATA });
             await candidate.save();
 
             const callArg = mockPrisma.candidate.update.mock.calls[0][0];
@@ -1111,12 +1005,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
             (notFoundError as any).code = 'P2025';
             mockPrisma.candidate.update.mockRejectedValue(notFoundError);
 
-            const candidate = new Candidate({
-                id: 999,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate({ id: 999, ...MINIMAL_CANDIDATE_DATA });
 
             await expect(candidate.save()).rejects.toThrow(
                 'No se pudo encontrar el registro del candidato con el ID proporcionado.'
@@ -1124,21 +1013,15 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should throw connection error with Spanish message on update', async () => {
-            const { Prisma } = require('@prisma/client');
 
-            const connectionError = new Prisma.PrismaClientInitializationError(
+            const connectionError = new MockPrismaClientInitializationError(
                 'Database connection failed',
                 'P1001',
                 '2.30.0'
             );
             mockPrisma.candidate.update.mockRejectedValue(connectionError);
 
-            const candidate = new Candidate({
-                id: 1,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-            });
+            const candidate = new Candidate({ id: 1, ...MINIMAL_CANDIDATE_DATA });
 
             await expect(candidate.save()).rejects.toThrow(
                 'No se pudo conectar con la base de datos. Por favor, asegúrese de que el servidor de base de datos esté en ejecución.'
@@ -1150,6 +1033,15 @@ describe('Fase 2: Domain Model Tests - RED', () => {
     // BLOQUE 2.4: Static Methods
     // ============================================================
     describe('Candidate.findOne()', () => {
+
+        // Shared fixture — full candidate DB record used across findOne tests
+        const CANDIDATE_DB_DATA = {
+            id: 1,
+            ...MINIMAL_CANDIDATE_DATA,
+            phone: '612345678',
+            address: 'Calle Mayor 123',
+        };
+
         beforeEach(() => {
             jest.clearAllMocks();
         });
@@ -1165,15 +1057,7 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 
         it('should return Candidate instance when found', async () => {
 
-            const dbData = {
-                id: 1,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                phone: '612345678',
-                address: 'Calle Mayor 123',
-            };
-            mockPrisma.candidate.findUnique.mockResolvedValue(dbData);
+            mockPrisma.candidate.findUnique.mockResolvedValue(CANDIDATE_DB_DATA);
 
             const result = await Candidate.findOne(1);
 
@@ -1190,16 +1074,8 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should return instance with correct properties', async () => {
-
-            const dbData = {
-                id: 1,
-                firstName: 'Juan',
-                lastName: 'Perez',
-                email: 'juan@example.com',
-                phone: '612345678',
-                address: 'Calle Mayor 123',
-            };
-            mockPrisma.candidate.findUnique.mockResolvedValue(dbData);
+            // Intentional: verifies complete property mapping contract from DB record to domain object
+            mockPrisma.candidate.findUnique.mockResolvedValue(CANDIDATE_DB_DATA);
 
             const result = await Candidate.findOne(1);
 
