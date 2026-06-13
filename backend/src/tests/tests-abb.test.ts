@@ -1120,14 +1120,22 @@ describe('Fase 2: Domain Model Tests - RED', () => {
 // ============================================================
 describe('Fase 3: File Upload Tests - RED', () => {
 
-    // Mock implementation of uploadFile for isolated testing
-    let uploadFile: (req: any, res: any) => void;
+    // Shared file fixtures — avoids repeating inline objects across acceptance/format/storage tests
+    const MOCK_PDF_FILE = {
+        path: '../uploads/1234567890-test.pdf',
+        mimetype: 'application/pdf',
+        originalname: 'test.pdf',
+    };
 
-    beforeAll(() => {
-        // Create a mock implementation that simulates the real fileUploadService behavior
-        // without actually using multer
-        uploadFile = (req: any, res: any) => {
-            // Check if there's a mock error set (simulating multer errors)
+    const MOCK_DOCX_FILE = {
+        path: '../uploads/1234567890-test.docx',
+        mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        originalname: 'test.docx',
+    };
+
+    // Extracted from beforeAll to keep setup declarative and separate implementation from lifecycle
+    const createUploadFileMock = (): (req: any, res: any) => void => {
+        return (req: any, res: any) => {
             const error = (globalThis as any).__multerError;
             if (error) {
                 delete (globalThis as any).__multerError;
@@ -1137,17 +1145,22 @@ describe('Fase 3: File Upload Tests - RED', () => {
                 return res.status(500).json({ error: error.message });
             }
 
-            // Check if file was rejected by filter (req.file not set)
             if (!req.file) {
                 return res.status(400).json({ error: 'Invalid file type, only PDF and DOCX are allowed!' });
             }
 
-            // Success case
             return res.status(200).json({
                 filePath: req.file.path,
                 fileType: req.file.mimetype,
             });
         };
+    };
+
+    // Mock implementation of uploadFile for isolated testing
+    let uploadFile: (req: any, res: any) => void;
+
+    beforeAll(() => {
+        uploadFile = createUploadFileMock();
     });
 
     // Helper to create mock Request and Response
@@ -1176,36 +1189,28 @@ describe('Fase 3: File Upload Tests - RED', () => {
     // ============================================================
     describe('File Type Acceptance', () => {
         it('should accept PDF files (application/pdf)', () => {
-            const req = createMockReq({
-                path: '../uploads/1234567890-test.pdf',
-                mimetype: 'application/pdf',
-                originalname: 'test.pdf',
-            });
+            const req = createMockReq(MOCK_PDF_FILE);
             const res = createMockRes();
 
             uploadFile(req, res);
 
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith({
-                filePath: '../uploads/1234567890-test.pdf',
-                fileType: 'application/pdf',
+                filePath: MOCK_PDF_FILE.path,
+                fileType: MOCK_PDF_FILE.mimetype,
             });
         });
 
         it('should accept DOCX files (application/vnd.openxmlformats-officedocument.wordprocessingml.document)', () => {
-            const req = createMockReq({
-                path: '../uploads/1234567890-test.docx',
-                mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                originalname: 'test.docx',
-            });
+            const req = createMockReq(MOCK_DOCX_FILE);
             const res = createMockRes();
 
             uploadFile(req, res);
 
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith({
-                filePath: '../uploads/1234567890-test.docx',
-                fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                filePath: MOCK_DOCX_FILE.path,
+                fileType: MOCK_DOCX_FILE.mimetype,
             });
         });
     });
@@ -1215,7 +1220,8 @@ describe('Fase 3: File Upload Tests - RED', () => {
     // ============================================================
     describe('File Type Rejection', () => {
         it('should reject JPEG files (400)', () => {
-            const req = createMockReq(null); // No file means rejected by filter
+            // Mock limitation: filter rejection is represented as req.file=null regardless of file type
+            const req = createMockReq(null);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1227,7 +1233,8 @@ describe('Fase 3: File Upload Tests - RED', () => {
         });
 
         it('should reject PNG files (400)', () => {
-            const req = createMockReq(null); // No file means rejected by filter
+            // Mock limitation: filter rejection is represented as req.file=null regardless of file type
+            const req = createMockReq(null);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1239,7 +1246,8 @@ describe('Fase 3: File Upload Tests - RED', () => {
         });
 
         it('should reject TXT files (400)', () => {
-            const req = createMockReq(null); // No file means rejected by filter
+            // Mock limitation: filter rejection is represented as req.file=null regardless of file type
+            const req = createMockReq(null);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1256,11 +1264,7 @@ describe('Fase 3: File Upload Tests - RED', () => {
     // ============================================================
     describe('Response Format', () => {
         it('should return filePath and fileType on success', () => {
-            const req = createMockReq({
-                path: '../uploads/1234567890-cv.pdf',
-                mimetype: 'application/pdf',
-                originalname: 'cv.pdf',
-            });
+            const req = createMockReq(MOCK_PDF_FILE);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1313,11 +1317,7 @@ describe('Fase 3: File Upload Tests - RED', () => {
     // ============================================================
     describe('File Naming and Storage', () => {
         it('should store files in ../uploads/ directory', () => {
-            const req = createMockReq({
-                path: '../uploads/1234567890-document.pdf',
-                mimetype: 'application/pdf',
-                originalname: 'document.pdf',
-            });
+            const req = createMockReq(MOCK_PDF_FILE);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1328,11 +1328,7 @@ describe('Fase 3: File Upload Tests - RED', () => {
         });
 
         it('should include timestamp prefix in filename', () => {
-            const req = createMockReq({
-                path: '../uploads/1234567890-resume.pdf',
-                mimetype: 'application/pdf',
-                originalname: 'resume.pdf',
-            });
+            const req = createMockReq(MOCK_PDF_FILE);
             const res = createMockRes();
 
             uploadFile(req, res);
@@ -1362,7 +1358,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
     let mockWorkExperienceConstructor: jest.Mock;
     let mockResumeConstructor: jest.Mock;
 
-    // Sample valid candidate data
+    // Fixture independent of Fase 1 fixtures — different describe scope prevents sharing
     const validCandidateData = {
         firstName: 'Juan',
         lastName: 'Pérez',
@@ -1379,12 +1375,12 @@ describe('Fase 4: Service Tests - addCandidate', () => {
     };
 
     beforeAll(() => {
-        // Create mock implementations
+        // Create mock functions — default return values are set in beforeEach to ensure clean state per test
         mockValidateCandidateData = jest.fn();
-        mockCandidateSave = jest.fn().mockResolvedValue({ id: 1, firstName: 'Juan', lastName: 'Pérez', email: 'juan@example.com' });
-        mockEducationSave = jest.fn().mockResolvedValue({ id: 1 });
-        mockWorkExperienceSave = jest.fn().mockResolvedValue({ id: 1 });
-        mockResumeSave = jest.fn().mockResolvedValue({ id: 1 });
+        mockCandidateSave = jest.fn();
+        mockEducationSave = jest.fn();
+        mockWorkExperienceSave = jest.fn();
+        mockResumeSave = jest.fn();
 
         // Mock constructors that return objects with save methods
         mockCandidateConstructor = jest.fn(() => ({
@@ -1494,11 +1490,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
                 throw new Error('Invalid name');
             });
 
-            try {
-                await addCandidate(validCandidateData);
-            } catch (e) {
-                // Expected error
-            }
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Invalid name');
 
             expect(mockCandidateConstructor).not.toHaveBeenCalled();
         });
@@ -1694,6 +1686,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
         });
 
         it('should handle candidate with no optional fields', async () => {
+            // Intentional: verifies complete negative contract — no related entity constructors called
             const dataNoOptionals = {
                 firstName: 'Carlos',
                 lastName: 'Ruiz',
@@ -1715,6 +1708,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
         });
 
         it('should handle candidate with all fields populated', async () => {
+            // Intentional: verifies complete positive contract — all constructors and saves called
             const fullData = {
                 firstName: 'María',
                 lastName: 'López',

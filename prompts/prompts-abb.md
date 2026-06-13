@@ -477,3 +477,53 @@ registra el prompt y respuesta anterior y procede con la implementacion
 Registrado plan de Fase 2 e implementadas las 4 correcciones. Ver resultado en sección siguiente.
 
 ---
+
+## Planificación Code Review Fase 3 y 4 - SOLID y Clean Code (2026-06-13)
+
+### Prompt del Usuario
+```
+planifica el code-review de @tests-abb.test.ts busca violaciones de principios SOLID y clean code en los mismos para los tests de la fase 3 y 4 de @test-abb-plan.md.
+
+muestrame el plan de implementación antes de proceder
+```
+
+### Respuesta del Asistente
+Plan presentado con 7 violaciones identificadas en Fase 3 y Fase 4:
+
+**Fase 3:**
+| Violación | Principio | Descripción |
+|-----------|-----------|-------------|
+| F3-V1 | DRY | Fixture PDF/DOCX repetido inline en 4 tests — extraer `MOCK_PDF_FILE` y `MOCK_DOCX_FILE` |
+| F3-V2 | DRY | 3 tests de rechazo (JPEG/PNG/TXT) con código idéntico — limitación del mock documentada |
+| F3-V3 | SRP | `beforeAll` implementa lógica de negocio inline — extraer a `createUploadFileMock()` |
+
+**Fase 4:**
+| Violación | Principio | Descripción |
+|-----------|-----------|-------------|
+| F4-V1 | DRY | `validCandidateData` duplica fixtures de Fase 1 — scope diferente impide reutilización, documentar |
+| F4-V2 | Clean Code | `try/catch` silencioso en test — reemplazar por `expect.assertions` + `.rejects` |
+| F4-V3 | DRY | `mockCandidateSave.mockResolvedValue` definido en `beforeAll` Y `beforeEach` — eliminar redundancia |
+| F4-V4/V5 | Clean Code | Multi-assert en 2 tests de edge cases — excepción intencionada documentada |
+
+**Plan de implementación (7 steps):**
+- S1: Extraer `MOCK_PDF_FILE` y `MOCK_DOCX_FILE` al scope de Fase 3
+- S2: Añadir comentario de limitación de mock en tests de rechazo
+- S3: Extraer lógica de `beforeAll` a función `createUploadFileMock()`
+- S4: Añadir comentario de fixture independiente por scope en Fase 4
+- S5: Reemplazar `try/catch` silencioso por `expect.assertions` + `.rejects`
+- S6: Eliminar valores por defecto redundantes del `beforeAll` de Fase 4
+- S7: Añadir comentarios de excepción intencionada en 2 tests multi-assert
+
+---
+
+## Implementación Code Review Fase 3 y 4 (2026-06-13)
+
+### Prompt del Usuario
+```
+registra el prompt y respuesta anterior en @[prompts/prompts-abb.md] y procede con la implementación
+```
+
+### Respuesta del Asistente
+Registrado plan e implementadas las 7 correcciones. 160 tests pasando sin regresiones.
+
+---
