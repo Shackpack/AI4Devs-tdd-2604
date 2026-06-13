@@ -6,6 +6,17 @@
 
 ---
 
+## Nota Importante
+
+**Todos los tests de este plan deben implementarse en:**
+```
+backend/src/tests/tests-abb.test.ts
+```
+
+Las ubicaciones alternativas mostradas en cada fase son solo referencia de organización lógica. El archivo único de implementación es `tests-abb.test.ts`.
+
+---
+
 ## Estrategia TDD
 
 ### Ciclo de Desarrollo
@@ -26,9 +37,10 @@
 
 ---
 
-## Fase 1: Validator Tests (`validator.test.ts`)
+## Fase 1: Validator Tests
 
-**Ubicación:** `backend/src/application/__tests__/validator.test.ts`
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/application/__tests__/validator.test.ts`
 
 ### Bloque 1.1: Validación de Nombres (firstName, lastName)
 ```typescript
@@ -198,12 +210,31 @@ describe('validateCV', () => {
 ```
 
 ### Bloque 1.9: Validación Integrada (validateCandidateData)
+
+**Comportamiento del Modo Edición (Update Mode):**
+
+La función `validateCandidateData` implementa una lógica dual según la presencia de `data.id`:
+
+| Modo | Condición | Comportamiento |
+|------|-----------|----------------|
+| **Create** | `!data.id` (undefined, null, falsy) | Validación completa de todos los campos obligatorios |
+| **Edit** | `data.id` (truthy) | **Se omite TODA la validación** - permite actualizaciones parciales |
+
+**Rationale del Modo Edición:**
+- Permite enviar solo los campos que se desean modificar (PATCH-like behavior)
+- Asume que el candidato ya pasó validación cuando fue creado
+- Útil para ediciones parciales desde el frontend sin enviar todos los datos
+
+**⚠️ Nota de Seguridad:** En producción, esta lógica debería combinarse con:
+1. Autenticación/Autorización (¿quién puede editar?)
+2. Validación específica del backend para el endpoint de update
+3. Potencialmente validación de campos permitidos para edición
+
 ```typescript
 describe('validateCandidateData', () => {
-  // Happy Path
+  // Happy Path - Create Mode
   it('should pass with valid complete candidate data', () => {});
   it('should pass with minimal required fields only', () => {});
-  it('should pass without optional fields (phone, address, educations, etc)', () => {});
   
   // Error Priority
   it('should throw first validation error encountered', () => {});
@@ -213,7 +244,9 @@ describe('validateCandidateData', () => {
   it('should validate all items in workExperiences array', () => {});
   it('should throw for first invalid education in array', () => {});
   
-  // Update mode
+  // Update Mode (Edit) - Skip Validation
+  // Cuando data.id está presente, se omite TODA la validación
+  // para soportar actualizaciones parciales de candidatos existentes
   it('should skip all validation when data.id is provided (edit mode)', () => {});
   it('should validate normally when data.id is undefined', () => {});
   it('should validate normally when data.id is null', () => {});
@@ -222,9 +255,10 @@ describe('validateCandidateData', () => {
 
 ---
 
-## Fase 2: Domain Model Tests (`candidate.model.test.ts`)
+## Fase 2: Domain Model Tests
 
-**Ubicación:** `backend/src/domain/models/__tests__/candidate.model.test.ts`
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/domain/models/__tests__/candidate.model.test.ts`
 
 ### Configuración de Mocks (Prisma)
 ```typescript
@@ -295,9 +329,10 @@ describe('Candidate.findOne()', () => {
 
 ---
 
-## Fase 3: File Upload Tests (`fileUpload.test.ts`)
+## Fase 3: File Upload Tests
 
-**Ubicación:** `backend/src/application/services/__tests__/fileUpload.test.ts`
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/application/services/__tests__/fileUpload.test.ts`
 
 ```typescript
 describe('uploadFile', () => {
@@ -318,9 +353,10 @@ describe('uploadFile', () => {
 
 ---
 
-## Fase 4: Service Tests (`candidateService.test.ts`)
+## Fase 4: Service Tests
 
-**Ubicación:** `backend/src/application/services/__tests__/candidateService.test.ts`
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/application/services/__tests__/candidateService.test.ts`
 
 ### Configuración
 - Mock validator
@@ -393,9 +429,10 @@ describe('addCandidate - Edge Cases', () => {
 
 ---
 
-## Fase 5: Controller Tests (`candidateController.test.ts`)
+## Fase 5: Controller Tests
 
-**Ubicación:** `backend/src/presentation/controllers/__tests__/candidateController.test.ts`
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/presentation/controllers/__tests__/candidateController.test.ts`
 
 ### Configuración
 ```typescript
@@ -449,9 +486,10 @@ describe('addCandidateController - Response Format', () => {
 
 ---
 
-## Fase 6: E2E API Tests (`candidate.api.test.ts`)
+## Fase 6: E2E API Tests
 
-**Ubicación:** `backend/src/tests/candidate.api.test.ts`  
+**Ubicación de implementación:** `backend/src/tests/tests-abb.test.ts`  
+**Referencia lógica:** `backend/src/tests/candidate.api.test.ts`  
 **Nota:** Requiere infraestructura (DB real o testcontainers)
 
 ```typescript

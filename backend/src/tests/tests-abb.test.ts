@@ -1,12 +1,42 @@
 /**
- * Fase 1: Validator Tests - Ciclo RED (TDD)
+ * Tests TDD - Inserción de Candidatos
  * 
- * Tests para las funciones de validación del caso de uso
- * "Inserción de Candidatos"
+ * Fase 1: Validator Tests
+ * Fase 2: Domain Model Tests
  * 
- * Estado: RED - Tests escritos, implementación pendiente
- * Ubicación: backend/src/tests/tests-abb.tests.ts
+ * Ubicación: backend/src/tests/tests-abb.test.ts
  */
+
+// ============================================================
+// MOCK PRISMA (debe estar antes de importar los modelos)
+// ============================================================
+const mockPrismaInstance = {
+    candidate: {
+        create: jest.fn(),
+        update: jest.fn(),
+        findUnique: jest.fn(),
+    },
+};
+
+class MockPrismaClientInitializationError extends Error {
+    code: string;
+    clientVersion: string;
+    constructor(message: string, code: string, clientVersion: string) {
+        super(message);
+        this.name = 'PrismaClientInitializationError';
+        this.code = code;
+        this.clientVersion = clientVersion;
+    }
+}
+
+jest.mock('@prisma/client', () => {
+    return {
+        PrismaClient: jest.fn(() => mockPrismaInstance),
+        Prisma: {
+            PrismaClientInitializationError: MockPrismaClientInitializationError,
+        },
+    };
+});
 
 import {
     validateName,
@@ -19,7 +49,14 @@ import {
     validateCV,
     validateCandidateData,
 } from '../application/validator';
+import { Candidate } from '../domain/models/Candidate';
+import { Education } from '../domain/models/Education';
+import { WorkExperience } from '../domain/models/WorkExperience';
+import { Resume } from '../domain/models/Resume';
 
+// ============================================================
+// FASE 1: VALIDATOR TESTS
+// ============================================================
 describe('Fase 1: Validator Tests - RED', () => {
 
     // ============================================================
@@ -446,15 +483,6 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validateCandidateData(minimal)).not.toThrow();
         });
 
-        it('should pass without optional fields (phone, address, educations, etc)', () => {
-            const withoutOptionals = {
-                firstName: 'Juan',
-                lastName: 'Pérez',
-                email: 'juan@example.com',
-            };
-            expect(() => validateCandidateData(withoutOptionals)).not.toThrow();
-        });
-
         // Error Priority
         it('should throw first validation error encountered (firstName)', () => {
             const data = { ...validCandidate, firstName: '' };
@@ -494,13 +522,18 @@ describe('Fase 1: Validator Tests - RED', () => {
             expect(() => validateCandidateData(data)).toThrow('Invalid institution');
         });
 
-        // Update mode
+        // Update mode: When data.id is present, validation is skipped entirely
+        // This supports partial updates (PATCH-like behavior) where only some fields
+        // are sent for editing an existing candidate. In edit mode, we assume the
+        // candidate already passed validation when created, so we allow partial updates.
+        // BEHAVIOR: If data.id exists (truthy) -> skip all validation
+        //           If data.id is undefined or null -> validate normally (create mode)
         it('should skip all validation when data.id is provided (edit mode)', () => {
             const dataWithId = {
                 ...validCandidate,
-                id: 1,
-                firstName: '', // Would normally fail
-                email: 'invalid-email', // Would normally fail
+                id: 1,              // Edit mode: bypasses all validation
+                firstName: '',      // Invalid but ignored in edit mode
+                email: 'invalid-email', // Invalid but ignored in edit mode
             };
             expect(() => validateCandidateData(dataWithId)).not.toThrow();
         });
@@ -558,6 +591,600 @@ describe('Fase 1: Validator Tests - RED', () => {
                 cv: { filePath: 'valid.pdf', fileType: 123 }, // Invalid type
             };
             expect(() => validateCandidateData(data)).toThrow('Invalid CV data');
+        });
+    });
+});
+
+// ============================================================
+// FASE 2: DOMAIN MODEL TESTS
+// ============================================================
+describe('Fase 2: Domain Model Tests - RED', () => {
+
+    // Access the shared mock instance
+    const mockPrisma = mockPrismaInstance;
+
+    // ============================================================
+    // BLOQUE 2.1: Candidate Constructor
+    // ============================================================
+    describe('Candidate Constructor', () => {
+        it('should create Candidate with all properties', () => {
+            const data = {
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                phone: '612345678',
+                address: 'Calle Mayor 123',
+                education: [],
+                workExperience: [],
+                resumes: [],
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.id).toBe(1);
+            expect(candidate.firstName).toBe('Juan');
+            expect(candidate.lastName).toBe('Perez');
+            expect(candidate.email).toBe('juan@example.com');
+            expect(candidate.phone).toBe('612345678');
+            expect(candidate.address).toBe('Calle Mayor 123');
+        });
+
+        it('should initialize empty arrays when education is undefined', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                education: undefined,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.education).toEqual([]);
+        });
+
+        it('should initialize empty arrays when education is null', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                education: null,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.education).toEqual([]);
+        });
+
+        it('should initialize empty arrays when workExperience is undefined', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                workExperience: undefined,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.workExperience).toEqual([]);
+        });
+
+        it('should initialize empty arrays when workExperience is null', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                workExperience: null,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.workExperience).toEqual([]);
+        });
+
+        it('should initialize empty arrays when resumes is undefined', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                resumes: undefined,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.resumes).toEqual([]);
+        });
+
+        it('should initialize empty arrays when resumes is null', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                resumes: null,
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.resumes).toEqual([]);
+        });
+
+        it('should handle partial data correctly', () => {
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.firstName).toBe('Juan');
+            expect(candidate.lastName).toBe('Perez');
+            expect(candidate.email).toBe('juan@example.com');
+            expect(candidate.phone).toBeUndefined();
+            expect(candidate.address).toBeUndefined();
+            expect(candidate.education).toEqual([]);
+            expect(candidate.workExperience).toEqual([]);
+            expect(candidate.resumes).toEqual([]);
+        });
+
+        it('should preserve Education instances in education array', () => {
+            const education = new Education({
+                institution: 'Universidad',
+                title: 'Ingenieria',
+                startDate: '2020-09-01',
+                endDate: '2024-06-30',
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                education: [education],
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.education).toHaveLength(1);
+            expect(candidate.education[0]).toBeInstanceOf(Education);
+        });
+
+        it('should preserve WorkExperience instances in workExperience array', () => {
+            const experience = new WorkExperience({
+                company: 'TechCorp',
+                position: 'Developer',
+                startDate: '2024-01-01',
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                workExperience: [experience],
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.workExperience).toHaveLength(1);
+            expect(candidate.workExperience[0]).toBeInstanceOf(WorkExperience);
+        });
+
+        it('should preserve Resume instances in resumes array', () => {
+            const resume = new Resume({
+                filePath: '/uploads/cv.pdf',
+                fileType: 'application/pdf',
+                candidateId: 1,
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                resumes: [resume],
+            };
+
+            const candidate = new Candidate(data);
+
+            expect(candidate.resumes).toHaveLength(1);
+            expect(candidate.resumes[0]).toBeInstanceOf(Resume);
+        });
+    });
+
+    // ============================================================
+    // BLOQUE 2.2: Save - Create Operation
+    // ============================================================
+    describe('Candidate.save() - Create', () => {
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        it('should call prisma.candidate.create with correct data', async () => {
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
+                data: {
+                    firstName: 'Juan',
+                    lastName: 'Perez',
+                    email: 'juan@example.com',
+                },
+            });
+        });
+
+        it('should not include undefined fields in create data', async () => {
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            const callArg = mockPrisma.candidate.create.mock.calls[0][0];
+            expect(callArg.data).not.toHaveProperty('phone');
+            expect(callArg.data).not.toHaveProperty('address');
+        });
+
+        it('should include optional fields when provided', async () => {
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                phone: '612345678',
+                address: 'Calle Mayor 123',
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
+                data: {
+                    firstName: 'Juan',
+                    lastName: 'Perez',
+                    email: 'juan@example.com',
+                    phone: '612345678',
+                    address: 'Calle Mayor 123',
+                },
+            });
+        });
+
+        it('should include nested educations when provided', async () => {
+
+            const education = new Education({
+                institution: 'Universidad',
+                title: 'Ingenieria',
+                startDate: '2020-09-01',
+                endDate: '2024-06-30',
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                education: [education],
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    educations: {
+                        create: [{
+                            institution: 'Universidad',
+                            title: 'Ingenieria',
+                            startDate: education.startDate,
+                            endDate: education.endDate,
+                        }],
+                    },
+                }),
+            });
+        });
+
+        it('should include nested workExperiences when provided', async () => {
+
+            const experience = new WorkExperience({
+                company: 'TechCorp',
+                position: 'Developer',
+                description: 'Backend dev',
+                startDate: '2024-01-01',
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                workExperience: [experience],
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    workExperiences: {
+                        create: [{
+                            company: 'TechCorp',
+                            position: 'Developer',
+                            description: 'Backend dev',
+                            startDate: experience.startDate,
+                            endDate: undefined,
+                        }],
+                    },
+                }),
+            });
+        });
+
+        it('should include nested resumes when provided', async () => {
+
+            const resume = new Resume({
+                filePath: '/uploads/cv.pdf',
+                fileType: 'application/pdf',
+                candidateId: 1,
+            });
+
+            const data = {
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                resumes: [resume],
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    resumes: {
+                        create: [{
+                            filePath: '/uploads/cv.pdf',
+                            fileType: 'application/pdf',
+                        }],
+                    },
+                }),
+            });
+        });
+
+        it('should return created candidate data', async () => {
+
+            const createdData = {
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            };
+            mockPrisma.candidate.create.mockResolvedValue(createdData);
+
+            const candidate = new Candidate({
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+
+            const result = await candidate.save();
+
+            expect(result).toEqual(createdData);
+        });
+
+        it('should throw Spanish error message on database connection error', async () => {
+            const { Prisma } = require('@prisma/client');
+
+            const connectionError = new Prisma.PrismaClientInitializationError(
+                'Database connection failed',
+                'P1001',
+                '2.30.0'
+            );
+            mockPrisma.candidate.create.mockRejectedValue(connectionError);
+
+            const candidate = new Candidate({
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+
+            await expect(candidate.save()).rejects.toThrow(
+                'No se pudo conectar con la base de datos. Por favor, asegúrese de que el servidor de base de datos esté en ejecución.'
+            );
+        });
+
+        it('should re-throw other errors', async () => {
+
+            const genericError = new Error('Some other error');
+            mockPrisma.candidate.create.mockRejectedValue(genericError);
+
+            const candidate = new Candidate({
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+
+            await expect(candidate.save()).rejects.toThrow('Some other error');
+        });
+    });
+
+    // ============================================================
+    // BLOQUE 2.3: Save - Update Operation
+    // ============================================================
+    describe('Candidate.save() - Update', () => {
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        it('should call prisma.candidate.update when id exists', async () => {
+
+            const data = {
+                id: 1,
+                firstName: 'Juan Updated',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            };
+
+            const candidate = new Candidate(data);
+            await candidate.save();
+
+            expect(mockPrisma.candidate.update).toHaveBeenCalledWith({
+                where: { id: 1 },
+                data: expect.objectContaining({
+                    firstName: 'Juan Updated',
+                    lastName: 'Perez',
+                    email: 'juan@example.com',
+                }),
+            });
+        });
+
+        it('should include id in where clause', async () => {
+
+            const candidate = new Candidate({
+                id: 5,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+            await candidate.save();
+
+            const callArg = mockPrisma.candidate.update.mock.calls[0][0];
+            expect(callArg.where).toEqual({ id: 5 });
+        });
+
+        it('should throw Spanish error when candidate not found (P2025)', async () => {
+
+            const notFoundError = new Error('Record not found');
+            (notFoundError as any).code = 'P2025';
+            mockPrisma.candidate.update.mockRejectedValue(notFoundError);
+
+            const candidate = new Candidate({
+                id: 999,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+
+            await expect(candidate.save()).rejects.toThrow(
+                'No se pudo encontrar el registro del candidato con el ID proporcionado.'
+            );
+        });
+
+        it('should throw connection error with Spanish message on update', async () => {
+            const { Prisma } = require('@prisma/client');
+
+            const connectionError = new Prisma.PrismaClientInitializationError(
+                'Database connection failed',
+                'P1001',
+                '2.30.0'
+            );
+            mockPrisma.candidate.update.mockRejectedValue(connectionError);
+
+            const candidate = new Candidate({
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+            });
+
+            await expect(candidate.save()).rejects.toThrow(
+                'No se pudo conectar con la base de datos. Por favor, asegúrese de que el servidor de base de datos esté en ejecución.'
+            );
+        });
+    });
+
+    // ============================================================
+    // BLOQUE 2.4: Static Methods
+    // ============================================================
+    describe('Candidate.findOne()', () => {
+        beforeEach(() => {
+            jest.clearAllMocks();
+        });
+
+        it('should call prisma.candidate.findUnique with correct id', async () => {
+
+            await Candidate.findOne(1);
+
+            expect(mockPrisma.candidate.findUnique).toHaveBeenCalledWith({
+                where: { id: 1 },
+            });
+        });
+
+        it('should return Candidate instance when found', async () => {
+
+            const dbData = {
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                phone: '612345678',
+                address: 'Calle Mayor 123',
+            };
+            mockPrisma.candidate.findUnique.mockResolvedValue(dbData);
+
+            const result = await Candidate.findOne(1);
+
+            expect(result).toBeInstanceOf(Candidate);
+        });
+
+        it('should return null when candidate not found', async () => {
+
+            mockPrisma.candidate.findUnique.mockResolvedValue(null);
+
+            const result = await Candidate.findOne(999);
+
+            expect(result).toBeNull();
+        });
+
+        it('should return instance with correct properties', async () => {
+
+            const dbData = {
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                phone: '612345678',
+                address: 'Calle Mayor 123',
+            };
+            mockPrisma.candidate.findUnique.mockResolvedValue(dbData);
+
+            const result = await Candidate.findOne(1);
+
+            expect(result?.id).toBe(1);
+            expect(result?.firstName).toBe('Juan');
+            expect(result?.lastName).toBe('Perez');
+            expect(result?.email).toBe('juan@example.com');
+            expect(result?.phone).toBe('612345678');
+            expect(result?.address).toBe('Calle Mayor 123');
+        });
+
+        it('should handle candidate with nested education', async () => {
+
+            const dbData = {
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Perez',
+                email: 'juan@example.com',
+                education: [
+                    {
+                        id: 1,
+                        institution: 'Universidad',
+                        title: 'Ingenieria',
+                        startDate: new Date('2020-09-01'),
+                        endDate: new Date('2024-06-30'),
+                    },
+                ],
+                workExperience: [],
+                resumes: [],
+            };
+            mockPrisma.candidate.findUnique.mockResolvedValue(dbData);
+
+            const result = await Candidate.findOne(1);
+
+            expect(result?.education).toHaveLength(1);
         });
     });
 });
