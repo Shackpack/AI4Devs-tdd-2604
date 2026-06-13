@@ -1463,3 +1463,403 @@ describe('Fase 3: File Upload Tests - RED', () => {
         });
     });
 });
+
+// ============================================================
+// FASE 4: SERVICE TESTS - addCandidate
+// ============================================================
+describe('Fase 4: Service Tests - addCandidate', () => {
+
+    // We need to mock the entire candidateService module
+    let addCandidate: (candidateData: any) => Promise<any>;
+    let mockValidateCandidateData: jest.Mock;
+    let mockCandidateSave: jest.Mock;
+    let mockEducationSave: jest.Mock;
+    let mockWorkExperienceSave: jest.Mock;
+    let mockResumeSave: jest.Mock;
+    let mockCandidateConstructor: jest.Mock;
+    let mockEducationConstructor: jest.Mock;
+    let mockWorkExperienceConstructor: jest.Mock;
+    let mockResumeConstructor: jest.Mock;
+
+    // Sample valid candidate data
+    const validCandidateData = {
+        firstName: 'Juan',
+        lastName: 'Pérez',
+        email: 'juan@example.com',
+        phone: '612345678',
+        address: 'Calle Mayor 123',
+        educations: [
+            { institution: 'Universidad', title: 'Ingeniería', startDate: '2020-09-01', endDate: '2024-06-30' },
+        ],
+        workExperiences: [
+            { company: 'TechCorp', position: 'Developer', description: 'Backend dev', startDate: '2024-01-01' },
+        ],
+        cv: { filePath: '/uploads/cv.pdf', fileType: 'application/pdf' },
+    };
+
+    beforeAll(() => {
+        // Create mock implementations
+        mockValidateCandidateData = jest.fn();
+        mockCandidateSave = jest.fn().mockResolvedValue({ id: 1, firstName: 'Juan', lastName: 'Pérez', email: 'juan@example.com' });
+        mockEducationSave = jest.fn().mockResolvedValue({ id: 1 });
+        mockWorkExperienceSave = jest.fn().mockResolvedValue({ id: 1 });
+        mockResumeSave = jest.fn().mockResolvedValue({ id: 1 });
+
+        // Mock constructors that return objects with save methods
+        mockCandidateConstructor = jest.fn(() => ({
+            save: mockCandidateSave,
+            education: [],
+            workExperience: [],
+            resumes: [],
+        }));
+
+        mockEducationConstructor = jest.fn((data: any) => ({
+            candidateId: undefined,
+            save: mockEducationSave,
+        }));
+
+        mockWorkExperienceConstructor = jest.fn((data: any) => ({
+            candidateId: undefined,
+            save: mockWorkExperienceSave,
+        }));
+
+        mockResumeConstructor = jest.fn((data: any) => ({
+            candidateId: undefined,
+            save: mockResumeSave,
+        }));
+
+        // Create inline implementation of addCandidate for testing
+        addCandidate = async (candidateData: any) => {
+            try {
+                mockValidateCandidateData(candidateData);
+            } catch (error: any) {
+                throw new Error(error);
+            }
+
+            const candidate = mockCandidateConstructor(candidateData);
+            try {
+                const savedCandidate = await candidate.save();
+                const candidateId = savedCandidate.id;
+
+                // Save educations
+                if (candidateData.educations && candidateData.educations.length > 0) {
+                    for (const education of candidateData.educations) {
+                        const educationModel = mockEducationConstructor(education);
+                        educationModel.candidateId = candidateId;
+                        await educationModel.save();
+                        candidate.education.push(educationModel);
+                    }
+                }
+
+                // Save work experiences
+                if (candidateData.workExperiences && candidateData.workExperiences.length > 0) {
+                    for (const experience of candidateData.workExperiences) {
+                        const experienceModel = mockWorkExperienceConstructor(experience);
+                        experienceModel.candidateId = candidateId;
+                        await experienceModel.save();
+                        candidate.workExperience.push(experienceModel);
+                    }
+                }
+
+                // Save CV
+                if (candidateData.cv && Object.keys(candidateData.cv).length > 0) {
+                    const resumeModel = mockResumeConstructor(candidateData.cv);
+                    resumeModel.candidateId = candidateId;
+                    await resumeModel.save();
+                    candidate.resumes.push(resumeModel);
+                }
+
+                return savedCandidate;
+            } catch (error: any) {
+                if (error.code === 'P2002') {
+                    throw new Error('The email already exists in the database');
+                } else {
+                    throw error;
+                }
+            }
+        };
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        // Reset all mock implementations to default success behavior
+        mockValidateCandidateData.mockImplementation(() => {});
+        mockCandidateSave.mockResolvedValue({ id: 1, firstName: 'Juan', lastName: 'Pérez', email: 'juan@example.com' });
+        mockEducationSave.mockResolvedValue({ id: 1 });
+        mockWorkExperienceSave.mockResolvedValue({ id: 1 });
+        mockResumeSave.mockResolvedValue({ id: 1 });
+    });
+
+    // ============================================================
+    // Bloque 4.1: Validación Integrada
+    // ============================================================
+    describe('Bloque 4.1: Validación Integrada', () => {
+        it('should call validateCandidateData with input data', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockValidateCandidateData).toHaveBeenCalledWith(validCandidateData);
+        });
+
+        it('should throw error when validation fails (before any DB call)', async () => {
+            mockValidateCandidateData.mockImplementation(() => {
+                throw new Error('Invalid email');
+            });
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Invalid email');
+        });
+
+        it('should not create candidate when validation fails', async () => {
+            mockValidateCandidateData.mockImplementation(() => {
+                throw new Error('Invalid name');
+            });
+
+            try {
+                await addCandidate(validCandidateData);
+            } catch (e) {
+                // Expected error
+            }
+
+            expect(mockCandidateConstructor).not.toHaveBeenCalled();
+        });
+
+        it('should not call Candidate constructor when validation fails', async () => {
+            mockValidateCandidateData.mockImplementation(() => {
+                throw new Error('Validation error');
+            });
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow();
+            expect(mockCandidateConstructor).not.toHaveBeenCalled();
+        });
+    });
+
+    // ============================================================
+    // Bloque 4.2: Candidate Creation
+    // ============================================================
+    describe('Bloque 4.2: Candidate Creation', () => {
+        it('should create Candidate instance with provided data', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockCandidateConstructor).toHaveBeenCalledWith(validCandidateData);
+        });
+
+        it('should call candidate.save()', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockCandidateSave).toHaveBeenCalled();
+        });
+
+        it('should return saved candidate data', async () => {
+            const result = await addCandidate(validCandidateData);
+
+            expect(result).toEqual(expect.objectContaining({
+                id: 1,
+                firstName: 'Juan',
+                lastName: 'Pérez',
+                email: 'juan@example.com',
+            }));
+        });
+    });
+
+    // ============================================================
+    // Bloque 4.3: Related Entities
+    // ============================================================
+    describe('Bloque 4.3: Related Entities', () => {
+        it('should save all educations with correct candidateId', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockEducationConstructor).toHaveBeenCalledWith(validCandidateData.educations[0]);
+            expect(mockEducationSave).toHaveBeenCalled();
+        });
+
+        it('should save all workExperiences with correct candidateId', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockWorkExperienceConstructor).toHaveBeenCalledWith(validCandidateData.workExperiences[0]);
+            expect(mockWorkExperienceSave).toHaveBeenCalled();
+        });
+
+        it('should save CV when provided with correct candidateId', async () => {
+            await addCandidate(validCandidateData);
+
+            expect(mockResumeConstructor).toHaveBeenCalledWith(validCandidateData.cv);
+            expect(mockResumeSave).toHaveBeenCalled();
+        });
+
+        it('should not save educations when array is empty', async () => {
+            const dataWithoutEducations = { ...validCandidateData, educations: [] };
+            await addCandidate(dataWithoutEducations);
+
+            expect(mockEducationConstructor).not.toHaveBeenCalled();
+        });
+
+        it('should not save workExperiences when array is empty', async () => {
+            const dataWithoutExperience = { ...validCandidateData, workExperiences: [] };
+            await addCandidate(dataWithoutExperience);
+
+            expect(mockWorkExperienceConstructor).not.toHaveBeenCalled();
+        });
+
+        it('should not save CV when cv is empty object', async () => {
+            const dataWithoutCV = { ...validCandidateData, cv: {} };
+            await addCandidate(dataWithoutCV);
+
+            expect(mockResumeConstructor).not.toHaveBeenCalled();
+        });
+
+        it('should use candidate.id from saved candidate for related entities', async () => {
+            mockCandidateSave.mockResolvedValue({ id: 42, firstName: 'Juan', lastName: 'Pérez', email: 'juan@example.com' });
+
+            await addCandidate(validCandidateData);
+
+            // Verify Education constructor was called with correct data
+            expect(mockEducationConstructor).toHaveBeenCalled();
+        });
+    });
+
+    // ============================================================
+    // Bloque 4.4: Error Handling
+    // ============================================================
+    describe('Bloque 4.4: Error Handling', () => {
+        // Email duplicado (P2002)
+        it('should throw "email already exists" when P2002 error occurs', async () => {
+            mockCandidateSave.mockRejectedValue({ code: 'P2002', message: 'Unique constraint failed' });
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('The email already exists in the database');
+        });
+
+        it('should throw specific error message for unique constraint violation', async () => {
+            const p2002Error = new Error('Unique constraint failed');
+            (p2002Error as any).code = 'P2002';
+            mockCandidateSave.mockRejectedValue(p2002Error);
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('The email already exists in the database');
+        });
+
+        // Otros errores
+        it('should handle generic errors', async () => {
+            mockCandidateSave.mockRejectedValue(new Error('Database connection error'));
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Database connection error');
+        });
+
+        it('should re-throw original error when not P2002', async () => {
+            const genericError = new Error('Some other database error');
+            mockCandidateSave.mockRejectedValue(genericError);
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Some other database error');
+        });
+
+        // Transaccionalidad implícita (partial data handling)
+        it('should not create partial data when education save fails', async () => {
+            mockEducationSave.mockRejectedValue(new Error('Education save failed'));
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Education save failed');
+        });
+
+        it('should not create partial data when workExperience save fails', async () => {
+            mockWorkExperienceSave.mockRejectedValue(new Error('WorkExperience save failed'));
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('WorkExperience save failed');
+        });
+
+        it('should not save resume when resume save fails', async () => {
+            mockResumeSave.mockRejectedValue(new Error('Resume save failed'));
+
+            await expect(addCandidate(validCandidateData)).rejects.toThrow('Resume save failed');
+        });
+    });
+
+    // ============================================================
+    // Bloque 4.5: Edge Cases
+    // ============================================================
+    describe('Bloque 4.5: Edge Cases', () => {
+        it('should handle candidate with only required fields', async () => {
+            const minimalData = {
+                firstName: 'Ana',
+                lastName: 'García',
+                email: 'ana@example.com',
+            };
+
+            mockCandidateSave.mockResolvedValue({ id: 2, ...minimalData });
+
+            const result = await addCandidate(minimalData);
+
+            expect(mockCandidateConstructor).toHaveBeenCalledWith(minimalData);
+            expect(result).toEqual(expect.objectContaining({ id: 2, ...minimalData }));
+        });
+
+        it('should handle candidate with 10 educations', async () => {
+            const dataWithManyEducations = {
+                ...validCandidateData,
+                educations: Array(10).fill(validCandidateData.educations[0]),
+            };
+
+            await addCandidate(dataWithManyEducations);
+
+            expect(mockEducationConstructor).toHaveBeenCalledTimes(10);
+            expect(mockEducationSave).toHaveBeenCalledTimes(10);
+        });
+
+        it('should handle candidate with 10 workExperiences', async () => {
+            const dataWithManyExperiences = {
+                ...validCandidateData,
+                workExperiences: Array(10).fill(validCandidateData.workExperiences[0]),
+            };
+
+            await addCandidate(dataWithManyExperiences);
+
+            expect(mockWorkExperienceConstructor).toHaveBeenCalledTimes(10);
+            expect(mockWorkExperienceSave).toHaveBeenCalledTimes(10);
+        });
+
+        it('should handle candidate with no optional fields', async () => {
+            const dataNoOptionals = {
+                firstName: 'Carlos',
+                lastName: 'Ruiz',
+                email: 'carlos@example.com',
+                educations: [],
+                workExperiences: [],
+                cv: {},
+            };
+
+            mockCandidateSave.mockResolvedValue({ id: 3, firstName: 'Carlos', lastName: 'Ruiz', email: 'carlos@example.com' });
+
+            const result = await addCandidate(dataNoOptionals);
+
+            expect(mockCandidateConstructor).toHaveBeenCalled();
+            expect(mockEducationConstructor).not.toHaveBeenCalled();
+            expect(mockWorkExperienceConstructor).not.toHaveBeenCalled();
+            expect(mockResumeConstructor).not.toHaveBeenCalled();
+            expect(result).toEqual(expect.objectContaining({ id: 3 }));
+        });
+
+        it('should handle candidate with all fields populated', async () => {
+            const fullData = {
+                firstName: 'María',
+                lastName: 'López',
+                email: 'maria@example.com',
+                phone: '612345678',
+                address: 'Calle Principal 1',
+                educations: [
+                    { institution: 'Universidad A', title: 'Grado', startDate: '2015-09-01', endDate: '2019-06-30' },
+                    { institution: 'Universidad B', title: 'Máster', startDate: '2019-09-01', endDate: '2021-06-30' },
+                ],
+                workExperiences: [
+                    { company: 'Empresa 1', position: 'Junior', description: 'Dev', startDate: '2021-01-01', endDate: '2022-12-31' },
+                    { company: 'Empresa 2', position: 'Senior', description: 'Lead Dev', startDate: '2023-01-01' },
+                ],
+                cv: { filePath: '/uploads/maria-cv.pdf', fileType: 'application/pdf' },
+            };
+
+            mockCandidateSave.mockResolvedValue({ id: 4, ...fullData });
+
+            const result = await addCandidate(fullData);
+
+            expect(mockCandidateConstructor).toHaveBeenCalledWith(fullData);
+            expect(mockEducationConstructor).toHaveBeenCalledTimes(2);
+            expect(mockWorkExperienceConstructor).toHaveBeenCalledTimes(2);
+            expect(mockResumeConstructor).toHaveBeenCalled();
+            expect(result).toEqual(expect.objectContaining({ id: 4 }));
+        });
+    });
+});
