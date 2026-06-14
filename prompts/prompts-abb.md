@@ -115,7 +115,7 @@ tomando el rol de experto en testing con jest revisa @[backend/src/tests/test-ab
 ```
 
 ### Respuesta del Asistente
-Evaluación completa del plan TDD realizada y guardada en `C:\Users\shack\.windsurf\plans\tdd-plan-evaluation-c8f9c7.md`:
+Evaluación completa del plan TDD realizada y guardada en `./.windsurf/plans/tdd-plan-evaluation-c8f9c7.md`:
 
 **Veredicto:** 8/10 - Buen plan con optimizaciones identificadas
 
@@ -525,5 +525,47 @@ registra el prompt y respuesta anterior en @[prompts/prompts-abb.md] y procede c
 
 ### Respuesta del Asistente
 Registrado plan e implementadas las 7 correcciones. 160 tests pasando sin regresiones.
+
+---
+
+## Refactor Tests - Real Implementations with Mocked Dependencies (2026-06-14)
+
+### Prompt del Usuario
+```
+Verify each finding against current code. Fix only still-valid issues, skip the
+rest with a brief reason, keep changes minimal, and validate.
+
+In `@backend/src/tests/tests-abb.test.ts` around lines 1408 - 1457, Tests
+currently inline fake implementations; replace them with imports of the real
+implementations and mock only their dependencies: for
+backend/src/tests/tests-abb.test.ts (lines 1408-1457) stop defining the inline
+addCandidate and instead import the real addCandidate function and stub/mock its
+dependencies validateCandidateData, Candidate (constructor), Education,
+WorkExperience, and Resume so the test controls behavior via mocks while
+exercising the real addCandidate logic; for backend/src/tests/tests-abb.test.ts
+(lines 1137-1164) stop inlining the upload handler/middleware and instead import
+the real upload handler and mock only multer plus the request/response plumbing
+so the test invokes the actual middleware code with controlled multer behavior.
+```
+
+### Respuesta del Asistente
+Refactor completado en `tests-abb.test.ts`:
+
+**Fase 3 (File Upload Tests):**
+- Eliminado `createUploadFileMock()` inline y variable `uploadFile` local
+- Importado `uploadFile` real desde `fileUploadService.ts`
+- Actualizado `createMockReq()` para usar `__mockFile` (patrón esperado por el mock de multer)
+- Fix al mock de multer: `diskStorage` y `MulterError` ahora son propiedades del default export (como el multer real)
+
+**Fase 4 (Service Tests):**
+- Eliminada implementación inline de `addCandidate` en `beforeAll`
+- Importado `addCandidate` real desde `candidateService.ts`
+- Agregados namespace imports (`* as validatorModule`, `* as CandidateModule`, etc.) para habilitar `jest.spyOn()`
+- Usando `jest.spyOn()` en los exports de módulos para mockear:
+  - `validateCandidateData`
+  - `Candidate`, `Education`, `WorkExperience`, `Resume` constructores
+- Tests ahora ejercitan la lógica **real** de `addCandidate` controlando comportamiento vía dependencias mockeadas
+
+**Resultado:** 160 tests pasando ✅
 
 ---

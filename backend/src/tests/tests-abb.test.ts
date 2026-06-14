@@ -20,34 +20,44 @@ jest.mock('multer', () => {
         getFilename: config.filename,
     }));
 
+    // Create the default multer function with diskStorage as a property
+    const multerMock = jest.fn(() => ({
+        single: jest.fn((fieldName: string) => {
+            // Return the middleware function that will be called
+            return (req: any, res: any, cb: any) => {
+                // Check if there's a mock error set
+                const error = (globalThis as any).__multerError;
+                if (error) {
+                    delete (globalThis as any).__multerError;
+                    return cb(error);
+                }
+                // Simulate successful upload by setting req.file
+                if (req.__mockFile) {
+                    req.file = req.__mockFile;
+                }
+                cb(null);
+            };
+        }),
+    }));
+
+    // Create MulterError class
+    class MulterError extends Error {
+        code: string;
+        constructor(message: string, code?: string) {
+            super(message);
+            this.name = 'MulterError';
+            this.code = code || 'UNKNOWN';
+        }
+    }
+
+    // Add diskStorage and MulterError as properties of the mock function (like real multer)
+    (multerMock as any).diskStorage = diskStorageMock;
+    (multerMock as any).MulterError = MulterError;
+
     return {
         __esModule: true,
-        default: jest.fn(() => ({
-            single: jest.fn((fieldName: string) => {
-                // Return the middleware function that will be called
-                return (req: any, res: any, cb: any) => {
-                    // Check if there's a mock error set
-                    const error = (globalThis as any).__multerError;
-                    if (error) {
-                        delete (globalThis as any).__multerError;
-                        return cb(error);
-                    }
-                    // Simulate successful upload by setting req.file
-                    if (req.__mockFile) {
-                        req.file = req.__mockFile;
-                    }
-                    cb(null);
-                };
-            }),
-        })),
-        MulterError: class MulterError extends Error {
-            code: string;
-            constructor(message: string, code?: string) {
-                super(message);
-                this.name = 'MulterError';
-                this.code = code || 'UNKNOWN';
-            }
-        },
+        default: multerMock,
+        MulterError: MulterError,
         diskStorage: diskStorageMock,
     };
 });
@@ -98,6 +108,15 @@ import { Candidate } from '../domain/models/Candidate';
 import { Education } from '../domain/models/Education';
 import { WorkExperience } from '../domain/models/WorkExperience';
 import { Resume } from '../domain/models/Resume';
+import { uploadFile } from '../application/services/fileUploadService';
+import { addCandidate } from '../application/services/candidateService';
+
+// Import modules as namespaces for spying in Phase 4
+import * as validatorModule from '../application/validator';
+import * as CandidateModule from '../domain/models/Candidate';
+import * as EducationModule from '../domain/models/Education';
+import * as WorkExperienceModule from '../domain/models/WorkExperience';
+import * as ResumeModule from '../domain/models/Resume';
 
 // ============================================================
 // FASE 1: VALIDATOR TESTS
@@ -1088,7 +1107,10 @@ describe('Fase 2: Domain Model Tests - RED', () => {
         });
 
         it('should handle candidate with nested education', async () => {
-
+            // NOTE: Candidate constructor expects 'education'/'workExperience' (singular)
+            // but Prisma schema uses 'educations'/'workExperiences' (plural).
+            // This test uses the field names Candidate constructor expects.
+            // To use Prisma field names, Candidate.ts constructor would need mapping logic.
             const dbData = {
                 id: 1,
                 firstName: 'Juan',
@@ -1133,40 +1155,13 @@ describe('Fase 3: File Upload Tests - RED', () => {
         originalname: 'test.docx',
     };
 
-    // Extracted from beforeAll to keep setup declarative and separate implementation from lifecycle
-    const createUploadFileMock = (): (req: any, res: any) => void => {
-        return (req: any, res: any) => {
-            const error = (globalThis as any).__multerError;
-            if (error) {
-                delete (globalThis as any).__multerError;
-                if (error.name === 'MulterError') {
-                    return res.status(500).json({ error: error.message });
-                }
-                return res.status(500).json({ error: error.message });
-            }
-
-            if (!req.file) {
-                return res.status(400).json({ error: 'Invalid file type, only PDF and DOCX are allowed!' });
-            }
-
-            return res.status(200).json({
-                filePath: req.file.path,
-                fileType: req.file.mimetype,
-            });
-        };
-    };
-
-    // Mock implementation of uploadFile for isolated testing
-    let uploadFile: (req: any, res: any) => void;
-
-    beforeAll(() => {
-        uploadFile = createUploadFileMock();
-    });
+    // The real uploadFile from fileUploadService is used
+    // multer is mocked at the top of the file to control middleware behavior
 
     // Helper to create mock Request and Response
-    // Sets req.file directly (simulating multer's behavior after successful upload)
+    // Sets req.__mockFile which the mocked multer middleware copies to req.file
     const createMockReq = (file?: any) => ({
-        file: file,
+        __mockFile: file,
         body: {},
     } as any);
 
@@ -1346,17 +1341,18 @@ describe('Fase 3: File Upload Tests - RED', () => {
 // ============================================================
 describe('Fase 4: Service Tests - addCandidate', () => {
 
-    // We need to mock the entire candidateService module
-    let addCandidate: (candidateData: any) => Promise<any>;
-    let mockValidateCandidateData: jest.Mock;
+    // The real addCandidate is imported from candidateService
+    // Its dependencies are mocked using jest.spyOn so tests control behavior via mocks while exercising real addCandidate logic
+    let mockValidateCandidateData: jest.SpyInstance;
     let mockCandidateSave: jest.Mock;
     let mockEducationSave: jest.Mock;
     let mockWorkExperienceSave: jest.Mock;
     let mockResumeSave: jest.Mock;
-    let mockCandidateConstructor: jest.Mock;
-    let mockEducationConstructor: jest.Mock;
-    let mockWorkExperienceConstructor: jest.Mock;
-    let mockResumeConstructor: jest.Mock;
+    let validateCandidateDataSpy: jest.SpyInstance;
+    let candidateSpy: jest.SpyInstance;
+    let educationSpy: jest.SpyInstance;
+    let workExperienceSpy: jest.SpyInstance;
+    let resumeSpy: jest.SpyInstance;
 
     // Fixture independent of Fase 1 fixtures — different describe scope prevents sharing
     const validCandidateData = {
@@ -1375,86 +1371,38 @@ describe('Fase 4: Service Tests - addCandidate', () => {
     };
 
     beforeAll(() => {
-        // Create mock functions — default return values are set in beforeEach to ensure clean state per test
-        mockValidateCandidateData = jest.fn();
+        // Set up mock save functions
         mockCandidateSave = jest.fn();
         mockEducationSave = jest.fn();
         mockWorkExperienceSave = jest.fn();
         mockResumeSave = jest.fn();
 
-        // Mock constructors that return objects with save methods
-        mockCandidateConstructor = jest.fn(() => ({
+        // Spy on and mock validateCandidateData
+        validateCandidateDataSpy = jest.spyOn(validatorModule, 'validateCandidateData').mockImplementation(() => {});
+        mockValidateCandidateData = validateCandidateDataSpy;
+
+        // Spy on and mock class constructors
+        candidateSpy = jest.spyOn(CandidateModule, 'Candidate').mockImplementation(() => ({
             save: mockCandidateSave,
             education: [],
             workExperience: [],
             resumes: [],
-        }));
+        }) as any);
 
-        mockEducationConstructor = jest.fn((data: any) => ({
+        educationSpy = jest.spyOn(EducationModule, 'Education').mockImplementation(() => ({
             candidateId: undefined,
             save: mockEducationSave,
-        }));
+        }) as any);
 
-        mockWorkExperienceConstructor = jest.fn((data: any) => ({
+        workExperienceSpy = jest.spyOn(WorkExperienceModule, 'WorkExperience').mockImplementation(() => ({
             candidateId: undefined,
             save: mockWorkExperienceSave,
-        }));
+        }) as any);
 
-        mockResumeConstructor = jest.fn((data: any) => ({
+        resumeSpy = jest.spyOn(ResumeModule, 'Resume').mockImplementation(() => ({
             candidateId: undefined,
             save: mockResumeSave,
-        }));
-
-        // Create inline implementation of addCandidate for testing
-        addCandidate = async (candidateData: any) => {
-            try {
-                mockValidateCandidateData(candidateData);
-            } catch (error: any) {
-                throw new Error(error);
-            }
-
-            const candidate = mockCandidateConstructor(candidateData);
-            try {
-                const savedCandidate = await candidate.save();
-                const candidateId = savedCandidate.id;
-
-                // Save educations
-                if (candidateData.educations && candidateData.educations.length > 0) {
-                    for (const education of candidateData.educations) {
-                        const educationModel = mockEducationConstructor(education);
-                        educationModel.candidateId = candidateId;
-                        await educationModel.save();
-                        candidate.education.push(educationModel);
-                    }
-                }
-
-                // Save work experiences
-                if (candidateData.workExperiences && candidateData.workExperiences.length > 0) {
-                    for (const experience of candidateData.workExperiences) {
-                        const experienceModel = mockWorkExperienceConstructor(experience);
-                        experienceModel.candidateId = candidateId;
-                        await experienceModel.save();
-                        candidate.workExperience.push(experienceModel);
-                    }
-                }
-
-                // Save CV
-                if (candidateData.cv && Object.keys(candidateData.cv).length > 0) {
-                    const resumeModel = mockResumeConstructor(candidateData.cv);
-                    resumeModel.candidateId = candidateId;
-                    await resumeModel.save();
-                    candidate.resumes.push(resumeModel);
-                }
-
-                return savedCandidate;
-            } catch (error: any) {
-                if (error.code === 'P2002') {
-                    throw new Error('The email already exists in the database');
-                } else {
-                    throw error;
-                }
-            }
-        };
+        }) as any);
     });
 
     beforeEach(() => {
@@ -1492,7 +1440,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             await expect(addCandidate(validCandidateData)).rejects.toThrow('Invalid name');
 
-            expect(mockCandidateConstructor).not.toHaveBeenCalled();
+            expect(candidateSpy).not.toHaveBeenCalled();
         });
 
         it('should not call Candidate constructor when validation fails', async () => {
@@ -1501,7 +1449,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
             });
 
             await expect(addCandidate(validCandidateData)).rejects.toThrow();
-            expect(mockCandidateConstructor).not.toHaveBeenCalled();
+            expect(candidateSpy).not.toHaveBeenCalled();
         });
     });
 
@@ -1512,7 +1460,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
         it('should create Candidate instance with provided data', async () => {
             await addCandidate(validCandidateData);
 
-            expect(mockCandidateConstructor).toHaveBeenCalledWith(validCandidateData);
+            expect(candidateSpy).toHaveBeenCalledWith(validCandidateData);
         });
 
         it('should call candidate.save()', async () => {
@@ -1540,21 +1488,21 @@ describe('Fase 4: Service Tests - addCandidate', () => {
         it('should save all educations with correct candidateId', async () => {
             await addCandidate(validCandidateData);
 
-            expect(mockEducationConstructor).toHaveBeenCalledWith(validCandidateData.educations[0]);
+            expect(educationSpy).toHaveBeenCalledWith(validCandidateData.educations[0]);
             expect(mockEducationSave).toHaveBeenCalled();
         });
 
         it('should save all workExperiences with correct candidateId', async () => {
             await addCandidate(validCandidateData);
 
-            expect(mockWorkExperienceConstructor).toHaveBeenCalledWith(validCandidateData.workExperiences[0]);
+            expect(workExperienceSpy).toHaveBeenCalledWith(validCandidateData.workExperiences[0]);
             expect(mockWorkExperienceSave).toHaveBeenCalled();
         });
 
         it('should save CV when provided with correct candidateId', async () => {
             await addCandidate(validCandidateData);
 
-            expect(mockResumeConstructor).toHaveBeenCalledWith(validCandidateData.cv);
+            expect(resumeSpy).toHaveBeenCalledWith(validCandidateData.cv);
             expect(mockResumeSave).toHaveBeenCalled();
         });
 
@@ -1562,21 +1510,21 @@ describe('Fase 4: Service Tests - addCandidate', () => {
             const dataWithoutEducations = { ...validCandidateData, educations: [] };
             await addCandidate(dataWithoutEducations);
 
-            expect(mockEducationConstructor).not.toHaveBeenCalled();
+            expect(educationSpy).not.toHaveBeenCalled();
         });
 
         it('should not save workExperiences when array is empty', async () => {
             const dataWithoutExperience = { ...validCandidateData, workExperiences: [] };
             await addCandidate(dataWithoutExperience);
 
-            expect(mockWorkExperienceConstructor).not.toHaveBeenCalled();
+            expect(workExperienceSpy).not.toHaveBeenCalled();
         });
 
         it('should not save CV when cv is empty object', async () => {
             const dataWithoutCV = { ...validCandidateData, cv: {} };
             await addCandidate(dataWithoutCV);
 
-            expect(mockResumeConstructor).not.toHaveBeenCalled();
+            expect(resumeSpy).not.toHaveBeenCalled();
         });
 
         it('should use candidate.id from saved candidate for related entities', async () => {
@@ -1585,7 +1533,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
             await addCandidate(validCandidateData);
 
             // Verify Education constructor was called with correct data
-            expect(mockEducationConstructor).toHaveBeenCalled();
+            expect(educationSpy).toHaveBeenCalled();
         });
     });
 
@@ -1657,7 +1605,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             const result = await addCandidate(minimalData);
 
-            expect(mockCandidateConstructor).toHaveBeenCalledWith(minimalData);
+            expect(candidateSpy).toHaveBeenCalledWith(minimalData);
             expect(result).toEqual(expect.objectContaining({ id: 2, ...minimalData }));
         });
 
@@ -1669,7 +1617,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             await addCandidate(dataWithManyEducations);
 
-            expect(mockEducationConstructor).toHaveBeenCalledTimes(10);
+            expect(educationSpy).toHaveBeenCalledTimes(10);
             expect(mockEducationSave).toHaveBeenCalledTimes(10);
         });
 
@@ -1681,7 +1629,7 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             await addCandidate(dataWithManyExperiences);
 
-            expect(mockWorkExperienceConstructor).toHaveBeenCalledTimes(10);
+            expect(workExperienceSpy).toHaveBeenCalledTimes(10);
             expect(mockWorkExperienceSave).toHaveBeenCalledTimes(10);
         });
 
@@ -1700,10 +1648,10 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             const result = await addCandidate(dataNoOptionals);
 
-            expect(mockCandidateConstructor).toHaveBeenCalled();
-            expect(mockEducationConstructor).not.toHaveBeenCalled();
-            expect(mockWorkExperienceConstructor).not.toHaveBeenCalled();
-            expect(mockResumeConstructor).not.toHaveBeenCalled();
+            expect(candidateSpy).toHaveBeenCalled();
+            expect(educationSpy).not.toHaveBeenCalled();
+            expect(workExperienceSpy).not.toHaveBeenCalled();
+            expect(resumeSpy).not.toHaveBeenCalled();
             expect(result).toEqual(expect.objectContaining({ id: 3 }));
         });
 
@@ -1730,10 +1678,10 @@ describe('Fase 4: Service Tests - addCandidate', () => {
 
             const result = await addCandidate(fullData);
 
-            expect(mockCandidateConstructor).toHaveBeenCalledWith(fullData);
-            expect(mockEducationConstructor).toHaveBeenCalledTimes(2);
-            expect(mockWorkExperienceConstructor).toHaveBeenCalledTimes(2);
-            expect(mockResumeConstructor).toHaveBeenCalled();
+            expect(candidateSpy).toHaveBeenCalledWith(fullData);
+            expect(educationSpy).toHaveBeenCalledTimes(2);
+            expect(workExperienceSpy).toHaveBeenCalledTimes(2);
+            expect(resumeSpy).toHaveBeenCalled();
             expect(result).toEqual(expect.objectContaining({ id: 4 }));
         });
     });
